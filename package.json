@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "jsencrypt": "^3.5.4"
+  }
+}
