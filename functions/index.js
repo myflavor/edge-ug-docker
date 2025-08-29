@@ -110,7 +110,8 @@ const proxy = async (request, origin, token) => {
     const response =  await fetch(targetUrl, {
         method: request.method,
         headers: targetHeaders,
-        body: request.body
+        body: request.body,
+        redirect: 'manual'
     })
     
     if (Array.from(response.headers.keys()).length === 1){
