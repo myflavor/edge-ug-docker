@@ -114,8 +114,13 @@ const proxy = async (request, origin, token) => {
         redirect: 'manual'
     })
     
-    if (Array.from(response.headers.keys()).length === 1){
-        throw new Error('访问错误')
+    if (Array.from(response.headers.keys()).length === 1) {
+        if (response.headers.get('content-type') === 'text/html; charset=UTF-8') {
+            const html = await response.text()
+            if (html.includes('https://www.ug.link/errorPage')) {
+                throw new Error('访问错误')
+            }
+        }
     }
     
     return response
