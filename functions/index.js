@@ -63,9 +63,7 @@ const login = async ctx => {
             username: config.username,
             password: ctx.password
         }),
-        headers: {
-            'Content-Type': 'application/json'
-        }
+        headers: {'Content-Type': 'application/json'}
     })
     const json = await response.json()
     return json.data
