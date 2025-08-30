@@ -1,8 +1,8 @@
 # 使用方法
 
-fork此仓库后，配置/functions/index.js中的UGlinkID和用户名密码还有容器端口（推荐使用没有权限的用户）
+复制此仓库后(设置私有仓库)，配置/functions/index.js中的UGlinkID和用户名密码还有容器端口（推荐使用没有权限的用户）
 
-在edge pages新建项目选择fork后的仓库，同时绑定自己的备案域名
+在edge pages新建项目选择复制的仓库，同时绑定自己的备案域名
 
 接着在edge pages中创建一个kv存储，命名空间名称任意
 
