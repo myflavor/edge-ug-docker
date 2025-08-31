@@ -7,7 +7,7 @@ const config = {
     port: 5244 // 容器端口
 }
 
-const kv = {
+const CacheManager = {
     key: config.alias + ':' + config.port,
     async get() {
         const value = await nas.get(this.key)
@@ -153,7 +153,7 @@ export async function onRequest(context) {
     const request = context.request
     
     try {
-        const cache = await kv.get()
+        const cache = await CacheManager.get()
         if (cache) {
             const response =  await proxy(request, cache.origin, cache.token)
             response.headers.set('x-edge-kv', 'hit')
@@ -176,7 +176,7 @@ export async function onRequest(context) {
         ctx.proxyToken = proxyInfo.token
         const response = await proxy(request, ctx.proxyOrigin, ctx.proxyToken)
         response.headers.set('x-edge-kv', 'miss')
-        await kv.set({origin: ctx.proxyOrigin, token: ctx.proxyToken})
+        await CacheManager.set({origin: ctx.proxyOrigin, token: ctx.proxyToken})
         return response
     } catch (error) {
         return new Response('访问出错', {status: 500})
