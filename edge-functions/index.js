@@ -23,10 +23,22 @@ const Database = {
 const CookieHelper = {
     getSetCookieObject(response) {
         const cookieObject = {}
-        const setCookie = response.headers.getSetCookie()
-        if (setCookie) {
-            for (let cookieStr of setCookie) {
-                const [key, value] = cookieStr.split(';')[0].split('=')
+        let setCookies = []
+        if (typeof response.headers.getSetCookie === 'function') {
+            setCookies = response.headers.getSetCookie() || []
+        }
+        if (!setCookies || setCookies.length === 0) {
+            const rawSetCookie = response.headers.get('set-cookie')
+            if (rawSetCookie) {
+                setCookies = [rawSetCookie]
+            }
+        }
+        for (let cookieStr of setCookies) {
+            if (!cookieStr) continue
+            const parts = cookieStr.split(';')[0].split('=')
+            if (parts.length >= 2) {
+                const key = parts[0].trim()
+                const value = parts.slice(1).join('=')
                 cookieObject[key] = value
             }
         }
@@ -34,13 +46,13 @@ const CookieHelper = {
     },
     getCookieObject(cookieStr) {
         const cookieObject = {}
-        if (cookieStr == null) {
-            return cookieObject
-        }
+        if (!cookieStr) return cookieObject
         const cookieArr = cookieStr.split('; ')
         for (let cookie of cookieArr) {
-            const cookieObj = cookie.split('=')
-            cookieObject[cookieObj[0]] = decodeURIComponent(cookieObj[1])
+            const parts = cookie.split('=')
+            if (parts.length >= 2) {
+                cookieObject[parts[0].trim()] = decodeURIComponent(parts.slice(1).join('='))
+            }
         }
         return cookieObject
     },
@@ -137,7 +149,13 @@ const getProxyInfo = async ctx => {
     const origin = new URL(ctx.dockerToken).origin
     const cookieObject = CookieHelper.getSetCookieObject(response)
     const token = cookieObject['ugreen-proxy-token']
-    if (!token) throw new Error('未能从重定向响应中提取 ugreen-proxy-token')
+    
+    if (!token) {
+        const clone = response.clone()
+        const text = await clone.text().catch(() => '')
+        const headersObj = Object.fromEntries(response.headers.entries())
+        throw new Error(`未能获取凭据。上游状态码: ${response.status}，响应头: ${JSON.stringify(headersObj)}，返回内容截取: ${text.slice(0, 150)}`)
+    }
     return {origin, token}
 }
 
