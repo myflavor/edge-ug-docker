@@ -129,7 +129,6 @@ const login = async ctx => {
 
 const getDockerToken = async ctx => {
     const config = ctx.config
-    if (!config.port) throw new Error('缺少环境变量: UG_PORT')
     const url = new URL(ctx.link + '/ugreen/v1/gateway/proxy/dockerToken')
     url.searchParams.set('token', ctx.token)
     url.searchParams.set('port', config.port)
@@ -138,25 +137,46 @@ const getDockerToken = async ctx => {
     if (!json.data || !json.data['redirect_url']) {
         throw new Error(`获取 Docker 代理重定向失败: ${JSON.stringify(json)}`)
     }
+    // 将整个数据对象挂载到 ctx，便于多维提取
+    ctx.dockerTokenData = json.data
     return json.data['redirect_url']
 }
 
 const getProxyInfo = async ctx => {
-    const response = await fetch(ctx.dockerToken, {
-        method: 'GET',
-        redirect: 'manual',
-    })
-    const origin = new URL(ctx.dockerToken).origin
-    const cookieObject = CookieHelper.getSetCookieObject(response)
-    const token = cookieObject['ugreen-proxy-token']
-    
-    if (!token) {
-        const clone = response.clone()
-        const text = await clone.text().catch(() => '')
-        const headersObj = Object.fromEntries(response.headers.entries())
-        throw new Error(`未能获取凭据。上游状态码: ${response.status}，响应头: ${JSON.stringify(headersObj)}，返回内容截取: ${text.slice(0, 150)}`)
+    const redirectUrlStr = ctx.dockerToken
+    const redirectUrlObj = new URL(redirectUrlStr)
+    const origin = redirectUrlObj.origin
+
+    // 1. 尝试直接从 URL 参数提取
+    let token = redirectUrlObj.searchParams.get('ugreen-proxy-token') || 
+                redirectUrlObj.searchParams.get('token') || 
+                redirectUrlObj.searchParams.get('proxy_token')
+
+    // 2. 尝试直接从 dockerToken 返回的 JSON 字段提取
+    if (!token && ctx.dockerTokenData) {
+        token = ctx.dockerTokenData['token'] || 
+                ctx.dockerTokenData['proxy_token'] || 
+                ctx.dockerTokenData['ugreen-proxy-token']
     }
-    return {origin, token}
+
+    // 3. 若前两步未提取到，再尝试通过网络请求获取 Cookie
+    if (!token) {
+        const response = await fetch(redirectUrlStr, {
+            method: 'GET',
+            redirect: 'manual',
+        })
+        const cookieObject = CookieHelper.getSetCookieObject(response)
+        token = cookieObject['ugreen-proxy-token']
+        
+        // 若仍然无 Token，打印完整诊断信息（包含 URL 和 JSON）
+        if (!token) {
+            const clone = response.clone()
+            const text = await clone.text().catch(() => '')
+            throw new Error(`无法定位 Token。完整 redirect_url 为: [${redirectUrlStr}]，接口返回的 JSON 为: [${JSON.stringify(ctx.dockerTokenData)}]，页面返回片段: [${text.slice(0, 100)}]`)
+        }
+    }
+
+    return { origin, token }
 }
 
 const proxy = async (request, origin, token) => {
